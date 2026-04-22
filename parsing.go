@@ -1,6 +1,7 @@
 package ufo
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -40,7 +41,7 @@ func ParseURL(input string, defaultProto string) ParsedURL {
 	if input == "" {
 		return ParsedURL{}
 	}
-	// Handle special protocols (blob:, data:, javascript:, vbscript:)
+
 	if m := specialProtoRe.FindStringSubmatch(input); m != nil {
 		proto := strings.ToLower(m[1])
 		pathname := m[2]
@@ -49,30 +50,33 @@ func ParseURL(input string, defaultProto string) ParsedURL {
 			Pathname: pathname,
 		}
 	}
-	// Check if input has a protocol or is protocol-relative
+
 	hasProto := hasProtocolRe.MatchString(input) || protocolRelRe.MatchString(input)
 	if !hasProto {
 		if defaultProto != "" {
 			return ParseURL(defaultProto+input, "")
 		}
-		pp := ParsePath(input)
+
+		parse := ParsePath(input)
 		return ParsedURL{
-			Pathname: pp.Pathname,
-			Search:   pp.Search,
-			Hash:     pp.Hash,
+			Pathname: parse.Pathname,
+			Search:   parse.Search,
+			Hash:     parse.Hash,
 		}
 	}
+
 	// Normalise backslashes
 	normalized := strings.ReplaceAll(input, "\\", "/")
 	m := fullURLRe.FindStringSubmatch(normalized)
-	protocol := ""
-	auth := ""
-	hostAndPath := ""
+
+	var protocol, auth, hostAndPath string
+
 	if m != nil {
 		protocol = m[1]
 		auth = m[2]
 		hostAndPath = m[3]
 	}
+
 	hm := hostPathRe.FindStringSubmatch(hostAndPath)
 	host := ""
 	path := ""
@@ -80,38 +84,42 @@ func ParseURL(input string, defaultProto string) ParsedURL {
 		host = hm[1]
 		path = hm[2]
 	}
-	// file: protocol strips leading slash before drive letter
+	// 'file:' protocol strips leading slash before drive letter
 	if strings.ToLower(protocol) == "file:" {
 		path = driveLetterRe.ReplaceAllString(path, "$1")
 	}
-	pp := ParsePath(path)
+
+	parse := ParsePath(path)
 	// strip trailing @ from auth
 	if len(auth) > 0 && auth[len(auth)-1] == '@' {
 		auth = auth[:len(auth)-1]
 	}
+
 	return ParsedURL{
 		Protocol:         strings.ToLower(protocol),
 		Auth:             auth,
 		Host:             host,
-		Pathname:         pp.Pathname,
-		Search:           pp.Search,
-		Hash:             pp.Hash,
+		Pathname:         parse.Pathname,
+		Search:           parse.Search,
+		Hash:             parse.Hash,
 		ProtocolRelative: protocol == "",
 	}
 }
 
-// ParseAuth splits "username:password" into its components (URL-decoded).
+// ParseAuth splits "username:password" into its components.
 func ParseAuth(input string) ParsedAuth {
 	if input == "" {
 		return ParsedAuth{}
 	}
-	idx := strings.Index(input, ":")
-	if idx == -1 {
+
+	username, password, found := strings.Cut(input, ":")
+	if !found {
 		return ParsedAuth{Username: Decode(input)}
 	}
+
 	return ParsedAuth{
-		Username: Decode(input[:idx]),
-		Password: Decode(input[idx+1:]),
+		Username: Decode(username),
+		Password: Decode(password),
 	}
 }
 
@@ -120,45 +128,59 @@ func ParseHost(input string) ParsedHost {
 	if input == "" {
 		return ParsedHost{}
 	}
+
 	m := hostPortRe.FindStringSubmatch(input)
 	if m == nil {
 		return ParsedHost{Hostname: Decode(input)}
 	}
+
 	return ParsedHost{
 		Hostname: Decode(m[1]),
 		Port:     m[2],
 	}
 }
 
-// StringifyParsedURL converts a ParsedURL back to a URL string.
-func StringifyParsedURL(parsed ParsedURL) string {
-	search := parsed.Search
-	if search != "" && !strings.HasPrefix(search, "?") {
-		search = "?" + search
+// String converts a ParsedURL back to a URL string.
+func (url ParsedURL) String() string {
+	if url.Search != "" && !strings.HasPrefix(url.Search, "?") {
+		url.Search = "?" + url.Search
 	}
-	auth := ""
-	if parsed.Auth != "" {
-		auth = parsed.Auth + "@"
+
+	if url.Auth != "" {
+		url.Auth = url.Auth + "@"
 	}
-	proto := ""
-	if parsed.Protocol != "" || parsed.ProtocolRelative {
-		proto = parsed.Protocol + "//"
+
+	if url.Protocol != "" || url.ProtocolRelative {
+		url.Protocol = url.Protocol + "//"
 	}
-	return proto + auth + parsed.Host + parsed.Pathname + search + parsed.Hash
+
+	return fmt.Sprintf("%s%s%s%s%s%s",
+		url.Protocol,
+		url.Auth,
+		url.Host,
+		url.Pathname,
+		url.Search,
+		url.Hash,
+	)
 }
 
+var _ fmt.Stringer = (*ParsedURL)(nil)
+
 // ParseFilename returns the last path segment from the URL's pathname.
-// With opts.Strict = true, only returns a name that contains a dot (extension).
+// With opts.Strict = true, only returns a name that contains a dot.
 func ParseFilename(input string, opts ParseFilenameOptions) string {
 	parsed := ParseURL(input, "")
+
 	var m []string
 	if opts.Strict {
 		m = filenameStrictRe.FindStringSubmatch(parsed.Pathname)
 	} else {
 		m = filenameRe.FindStringSubmatch(parsed.Pathname)
 	}
+
 	if m == nil {
 		return ""
 	}
+
 	return m[1]
 }
