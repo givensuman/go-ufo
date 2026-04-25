@@ -1,11 +1,10 @@
-# ufo
+<div align="center">
+  <img src="./assets/logo.svg" alt="go-ufo" width="200" />
+</div>
 
-[![npm version][npm-version-src]][npm-version-href]
-[![npm downloads][npm-downloads-src]][npm-downloads-href]
-[![bundle][bundle-src]][bundle-href]
-[![Codecov][codecov-src]][codecov-href]
+# go-ufo
 
-URL utils for humans.
+This is a port of the [unjs.io/ufo](https://unjs.io/packages/ufo) package to Go.
 
 ## Install
 
@@ -562,21 +561,11 @@ withTrailingSlash("/foo"); // "/foo/"
 withTrailingSlash("/path?query=true", true); // "/path/?query=true"
 ```
 
-<!-- /automd -->
+## Why?
+
+I'm a fan of the [unjs.io](unjs.io) ecosystem, particularly their excellent API design. So I thought why not Go?
 
 ## License
 
 [MIT](./LICENSE)
 
-Special thanks to Eduardo San Martin Morote ([posva](https://github.com/posva)) for [encoding utilities](https://github.com/vuejs/vue-router-next/blob/v4.0.1/src/encoding.ts)
-
-<!-- Badges -->
-
-[npm-version-src]: https://img.shields.io/npm/v/ufo?style=flat&colorA=18181B&colorB=F0DB4F
-[npm-version-href]: https://npmjs.com/package/ufo
-[npm-downloads-src]: https://img.shields.io/npm/dm/ufo?style=flat&colorA=18181B&colorB=F0DB4F
-[npm-downloads-href]: https://npmjs.com/package/ufo
-[codecov-src]: https://img.shields.io/codecov/c/gh/unjs/ufo/main?style=flat&colorA=18181B&colorB=F0DB4F
-[codecov-href]: https://codecov.io/gh/unjs/ufo
-[bundle-src]: https://img.shields.io/bundlephobia/minzip/ufo?style=flat&colorA=18181B&colorB=F0DB4F
-[bundle-href]: https://bundlephobia.com/result?p=ufo
