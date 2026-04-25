@@ -30,14 +30,6 @@ type ParsedHost struct {
 	Port     string
 }
 
-// HasProtocolOptions controls the behaviour of HasProtocol.
-type HasProtocolOptions struct {
-	// AcceptRelative treats protocol-relative URLs (//foo.com) as having a protocol.
-	AcceptRelative bool
-	// Strict requires the protocol to be followed by "//" (rules out "data:" etc.).
-	Strict bool
-}
-
 // CompareURLOptions controls the behaviour of IsEqual.
 type CompareURLOptions struct {
 	TrailingSlash bool

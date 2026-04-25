@@ -1,6 +1,7 @@
 package ufo
 
 import (
+	"maps"
 	"regexp"
 	"strings"
 )
@@ -14,253 +15,410 @@ var (
 	joinLeadingSlashRe = regexp.MustCompile(`^\.?/`)
 )
 
-// IsRelative returns true if the input starts with "./" or "../".
+// IsRelative checks if a path starts with "./" or "../".
+//
+// Example:
+//
+//	IsRelative("./foo")  // true
 func IsRelative(inputString string) bool {
 	return strings.HasPrefix(inputString, "./") || strings.HasPrefix(inputString, "../")
 }
 
-// HasProtocol checks if the input has a URL protocol.
-func HasProtocol(inputString string, opts HasProtocolOptions) bool {
+// HasProtocol checks if the input has a protocol. You can
+// use `opts.AcceptRelative = true` to accept relative URLs
+// as valid protocol. Use `opts.Strict = true` to strictly check
+// for RFC 3986 protocols.
+//
+// Examples:
+//
+//	HasProtocol("https://example.com", nil) // true
+//	HasProtocol("//example.com", nil) // false
+//
+// The same examples, allowing relative URLs:
+//
+//	HasProtocol("https://example.com", &HasProtocolOptions{ AcceptRelative: true }) // true
+//	HasProtocol("//example.com", &HasProtocolOptions{ AcceptRelative: true }) // true
+//
+// Example distinction of strict protocol check:
+//
+//	HasProtocol("data:text/plain", nil) // true
+//	HasProtocol("data:text/plain", &HasProtocolOptions{ Strict: true }) // false
+func HasProtocol(inputString string, opts *HasProtocolOptions) bool {
 	if opts.Strict {
 		return protocolStrictRe.MatchString(inputString)
 	}
+
 	return protocolRe.MatchString(inputString) ||
 		(opts.AcceptRelative && protocolRelativeRe.MatchString(inputString))
 }
 
-// IsScriptProtocol checks if the protocol is one of the dangerous script protocols.
+type HasProtocolOptions struct {
+	// Accept relative URLs as valid protocol.
+	AcceptRelative bool
+	// Strictly check for RFC 3986 protocols.
+	Strict bool
+}
+
+// IsScriptProtocol checks if the input protocol is any of
+// the dangerous "blob:", "data:", "javascript:" or
+// "vbscript:" protocols.
+//
+// Examples:
+//
+//	IsScriptProtocol("javascript:alert(1)") // true
+//	IsScriptProtocol("data:text/html,hello") // true
+//	IsScriptProtocol("blob:hello") // true
+//	IsScriptProtocol("vbscript:alert(1)") // true
+//	IsScriptProtocol("https://examples.com") // false
 func IsScriptProtocol(protocol string) bool {
 	return protocol != "" && protocolScriptRe.MatchString(protocol)
 }
 
-// HasTrailingSlash checks if input has a trailing slash.
-// If respectQueryAndFragment is true, a slash before ? or # also counts.
-func HasTrailingSlash(input string, respectQueryAndFragment bool) bool {
+type RespectQueryAndFragmentOption struct {
+	// Count a slash before a query string or hash as a trailing slash.
+	RespectQueryAndFragment bool
+}
+
+var dontRespect = &RespectQueryAndFragmentOption{false}
+
+// doRespect   = &RespectQueryAndFragmentOption{true}
+
+func (r *RespectQueryAndFragmentOption) isTrue() bool {
+	return r != nil && r.RespectQueryAndFragment
+}
+
+// HasTrailingSlash checks if input has a trailing slash. You
+// can use the `respectQueryAndFragment` parameter to
+// count a slash before a query string or hash as a trailing slash.
+//
+// Examples:
+//
+//	HasTrailingSlash("/foo/", nil) // true
+//	HasTrailingSlash("/foo", nil) // false
+//	HasTrailingSlash("/foo?query=true", &RespectQueryAndFragmentOption{ true }) // false
+//	HasTrailingSlash("/foo/?query=true", &RespectQueryAndFragmentOption{ true }) // true
+func HasTrailingSlash(input string, respectQueryAndFragment *RespectQueryAndFragmentOption) bool {
 	if input == "" {
 		return false
 	}
-	if !respectQueryAndFragment {
+
+	if respectQueryAndFragment.isTrue() {
 		return strings.HasSuffix(input, "/")
 	}
+
 	return trailingSlashRe.MatchString(input)
 }
 
 // WithoutTrailingSlash removes the trailing slash from a URL.
-func WithoutTrailingSlash(input string, respectQueryAndFragment bool) string {
+//
+// Examples:
+//
+//	WithoutTrailingSlash("/foo/", nil) // "/foo"
+//	WithoutTrailingSlash("/path/?query=true", &RespectQueryAndFragmentOption{ true }) // "/path?query=true"
+func WithoutTrailingSlash(input string, respectQueryAndFragment *RespectQueryAndFragmentOption) string {
 	if input == "" {
 		return "/"
 	}
-	if !respectQueryAndFragment {
-		if HasTrailingSlash(input, false) {
+
+	if !respectQueryAndFragment.isTrue() {
+		if HasTrailingSlash(input, dontRespect) {
 			r := input[:len(input)-1]
 			if r == "" {
 				return "/"
 			}
+
 			return r
 		}
+
 		return input
 	}
-	if !HasTrailingSlash(input, true) {
+
+	if !HasTrailingSlash(input, dontRespect) {
 		return input
 	}
+
 	path := input
 	fragment := ""
 	if idx := strings.Index(input, "#"); idx != -1 {
 		path = input[:idx]
 		fragment = input[idx:]
 	}
+
 	parts := strings.SplitN(path, "?", 2)
-	cleanPath := parts[0]
-	if strings.HasSuffix(cleanPath, "/") {
-		cleanPath = cleanPath[:len(cleanPath)-1]
-	}
+	cleanPath := strings.TrimSuffix(parts[0], "/")
+
 	if cleanPath == "" {
 		cleanPath = "/"
 	}
+
 	query := ""
 	if len(parts) > 1 {
 		query = "?" + parts[1]
 	}
+
 	return cleanPath + query + fragment
 }
 
 // WithTrailingSlash ensures the URL ends with a trailing slash.
-func WithTrailingSlash(input string, respectQueryAndFragment bool) string {
+//
+// Examples:
+//
+//	WithTrailingSlash("/foo", nil) // "/foo/"
+//	WithTrailingSlash("/path?query=true", &RespectQueryAndFragmentOption{ true }) // "/path/?query=true"
+func WithTrailingSlash(input string, respectQueryAndFragment *RespectQueryAndFragmentOption) string {
 	if input == "" {
 		return "/"
 	}
-	if !respectQueryAndFragment {
+
+	if !respectQueryAndFragment.isTrue() {
 		if strings.HasSuffix(input, "/") {
 			return input
 		}
+
 		return input + "/"
 	}
-	if HasTrailingSlash(input, true) {
+
+	if HasTrailingSlash(input, dontRespect) {
 		return input
 	}
+
 	path := input
 	fragment := ""
 	if idx := strings.Index(input, "#"); idx != -1 {
 		path = input[:idx]
 		fragment = input[idx:]
+
 		if path == "" {
 			return fragment
 		}
 	}
+
 	parts := strings.SplitN(path, "?", 2)
 	query := ""
 	if len(parts) > 1 {
 		query = "?" + parts[1]
 	}
+
 	return parts[0] + "/" + query + fragment
 }
 
-// HasLeadingSlash checks if input starts with "/".
+// HasLeadingSlash checks if the input has a leading slash.
+//
+// Example:
+//
+//	HasLeadingSlash("/foo") // true
 func HasLeadingSlash(input string) bool {
 	return strings.HasPrefix(input, "/")
 }
 
-// WithoutLeadingSlash removes the leading slash from input.
+// WithoutLeadingSlash removes the leading slash
+// from the URL or pathname.
+//
+// Example:
+//
+//	WithoutLeadingSlash("/foo") // "foo"
 func WithoutLeadingSlash(input string) string {
 	if HasLeadingSlash(input) {
 		return input[1:]
 	}
+
 	return input
 }
 
-// WithLeadingSlash ensures input starts with "/".
+// WithLeadingSlash ensures the URL or pathname
+// has a leading slash.
+//
+// Example:
+//
+//	WithLeadingSlash("foo") // "/foo"
 func WithLeadingSlash(input string) string {
 	if HasLeadingSlash(input) {
 		return input
 	}
+
 	return "/" + input
 }
 
-// CleanDoubleSlashes removes consecutive slashes within a URL (preserving ://).
+// CleanDoubleSlashes removes double slashes from the URL.
+//
+// Examples:
+//
+//	CleanDoubleSlashes("//foo//bar//") // "/foo/bar/"
+//	CleanDoubleSlashes("http://example.com/analyze//http://localhost:3000/")
+//	// Returns "http://example.com/analyze/http://localhost:3000/"
 func CleanDoubleSlashes(input string) string {
 	re := regexp.MustCompile(`/{2,}`)
 	parts := strings.Split(input, "://")
 	for i, part := range parts {
 		parts[i] = re.ReplaceAllString(part, "/")
 	}
+
 	return strings.Join(parts, "://")
 }
 
-// WithBase ensures input starts with base (prefix).
+// WithBase ensures the URL or pathname starts with base.
+//
+// Examples:
+//
+//	WithBase("/foo/bar", "/foo") // "/foo/bar"
+//	WithBase("/foo/bar", "/baz") // "/baz/foo/bar"
 func WithBase(input string, base string) string {
-	if IsEmptyURL(base) || HasProtocol(input, HasProtocolOptions{}) {
+	if IsEmptyURL(base) || HasProtocol(input, nil) {
 		return input
 	}
-	b := WithoutTrailingSlash(base, false)
+
+	b := WithoutTrailingSlash(base, dontRespect)
 	if strings.HasPrefix(input, b) {
 		next := ""
 		if len(input) > len(b) {
 			next = string(input[len(b)])
 		}
+
 		if next == "" || next == "/" || next == "?" {
 			return input
 		}
 	}
+
 	return JoinURL(b, input)
 }
 
-// WithoutBase removes base prefix from input.
+// WithoutBase removes the base from the URL or pathname.
+//
+// Example:
+//
+//	WithoutBase("/foo/bar", "/foo") // "/bar"
 func WithoutBase(input string, base string) string {
 	if IsEmptyURL(base) {
 		return input
 	}
-	b := WithoutTrailingSlash(base, false)
+
+	b := WithoutTrailingSlash(base, dontRespect)
 	if !strings.HasPrefix(input, b) {
 		return input
 	}
+
 	next := ""
 	if len(input) > len(b) {
 		next = string(input[len(b)])
 	}
+
 	if next != "" && next != "/" && next != "?" {
 		return input
 	}
+
 	trimmed := input[len(b):]
 	if trimmed == "" || trimmed[0] != '/' {
 		return "/" + trimmed
 	}
+
 	return trimmed
 }
 
-// WithQuery adds or replaces query params on a URL.
+// WithQuery adds or replaces query params of the URL.
+//
+// Example:
+//
+//	WithQuery("/foo?page=a", &QueryObject{ token: "secret" })
+//	// Returns "/foo?page=a&token=secret"
 func WithQuery(input string, query QueryObject) string {
 	parsed := ParseURL(input, "")
 	existing := ParseQuery(parsed.Search)
-	for k, v := range query {
-		existing[k] = v
-	}
+	maps.Copy(query, existing)
+
 	qs := StringifyQuery(QueryObject(existing))
 	if qs != "" {
 		parsed.Search = "?" + qs
 	} else {
 		parsed.Search = ""
 	}
-	return StringifyParsedURL(parsed)
+
+	return parsed.String()
 }
 
-// FilterQuery filters query parameters by a predicate.
-func FilterQuery(input string, predicate func(key string, value interface{}) bool) string {
+// FilterQuery removes the query section of the URL.
+//
+// Example:
+//
+//	FilterQuery("/foo?bar=1&baz=2", func(k string, v any) bool {
+//		return k != "bar"
+//	}) // "/foo?baz=2"
+func FilterQuery(input string, callback func(k string, v any) bool) string {
 	if !strings.Contains(input, "?") {
 		return input
 	}
+
 	parsed := ParseURL(input, "")
 	q := ParseQuery(parsed.Search)
 	filtered := make(QueryObject)
+
 	for k, v := range q {
-		if predicate(k, v) {
+		// We may want to change callback to a `yield`
+		// https://go.dev/blog/range-functions
+		if callback(k, v) {
 			filtered[k] = v
+		} else {
+			continue
 		}
 	}
+
 	qs := StringifyQuery(filtered)
 	if qs != "" {
 		parsed.Search = "?" + qs
 	} else {
 		parsed.Search = ""
 	}
-	return StringifyParsedURL(parsed)
+
+	return parsed.String()
 }
 
-// GetQuery parses and returns the query object of a URL.
-func GetQuery(input string) map[string]interface{} {
+// GetQuery parses and decodes the query object of an
+// input URL into a map.
+//
+// Example:
+//
+//	GetQuery("http://foo.com/foo?test=123&unicode=%E5%A5%BD")
+//	// Returns map[string]any{ test: "123", unicode: "好" }
+func GetQuery(input string) map[string]any {
 	return ParseQuery(ParseURL(input, "").Search)
 }
 
-// IsEmptyURL checks if the URL is empty or just "/".
+// IsEmptyURL checks if the input URL is empty or "/".
 func IsEmptyURL(url string) bool {
 	return url == "" || url == "/"
 }
 
 // IsNonEmptyURL checks if the URL is neither empty nor "/".
 func IsNonEmptyURL(url string) bool {
-	return !IsEmptyURL(url)
+	return url != "" && url != "/"
 }
 
-// JoinURL joins multiple URL segments.
+// JoinURL joins multiple URL segments into a single URL.
+//
+// Example:
+//
+//	JoinURL("a", "/b", "/c") // "a/b/c"
 func JoinURL(base string, input ...string) string {
 	url := base
 	for _, segment := range input {
 		if !IsNonEmptyURL(segment) {
 			continue
 		}
+
 		if url != "" {
 			seg := joinLeadingSlashRe.ReplaceAllString(segment, "")
-			url = WithTrailingSlash(url, false) + seg
+			url = WithTrailingSlash(url, dontRespect) + seg
 		} else {
 			url = segment
 		}
 	}
+
 	return url
 }
 
-// splitURLPath splits a path on single slashes (not double slashes).
 func splitURLPath(path string) []string {
 	var result []string
 	start := 0
+
 	for j := 0; j < len(path); j++ {
 		if path[j] == '/' {
 			// skip if next char is also '/'
@@ -271,11 +429,17 @@ func splitURLPath(path string) []string {
 			start = j + 1
 		}
 	}
+
 	result = append(result, path[start:])
 	return result
 }
 
-// JoinRelativeURL joins URL segments and resolves "." and ".." components.
+// JoinRelativeURL joins multiple URL segments into
+// a single URL and also handles relative paths with "./" and "../"
+//
+// Example:
+//
+//	JoinRelativeURL("/a", "../b", "./c") // "/b/c"
 func JoinRelativeURL(input ...string) string {
 	segments := []string{}
 	segmentsDepth := 0
@@ -291,24 +455,30 @@ func JoinRelativeURL(input ...string) string {
 		if i == "" || i == "/" {
 			continue
 		}
+
 		for sindex, s := range splitURLPath(i) {
 			if s == "" || s == "." {
 				continue
 			}
+
 			if s == ".." {
-				if len(segments) == 1 && HasProtocol(segments[0], HasProtocolOptions{}) {
+				if len(segments) == 1 && HasProtocol(segments[0], &HasProtocolOptions{}) {
 					continue
 				}
+
 				if len(segments) > 0 {
 					segments = segments[:len(segments)-1]
 				}
+
 				segmentsDepth--
 				continue
 			}
+
 			if sindex == 1 && len(segments) > 0 && strings.HasSuffix(segments[len(segments)-1], ":/") {
 				segments[len(segments)-1] += "/" + s
 				continue
 			}
+
 			segments = append(segments, s)
 			segmentsDepth++
 		}
@@ -329,49 +499,79 @@ func JoinRelativeURL(input ...string) string {
 	if len(filtered) > 0 && strings.HasSuffix(filtered[len(filtered)-1], "/") && !strings.HasSuffix(url, "/") {
 		url += "/"
 	}
+
 	return url
 }
 
 // WithHTTP adds or replaces the URL protocol with "http://".
+//
+// Example:
+//
+//	WithHTTP("https://example.com") // http://example.com
 func WithHTTP(input string) string {
 	return WithProtocol(input, "http://")
 }
 
 // WithHTTPS adds or replaces the URL protocol with "https://".
+//
+// Example:
+//
+//	WithHTTPS("http://example.com") // https://example.com
 func WithHTTPS(input string) string {
 	return WithProtocol(input, "https://")
 }
 
-// WithoutProtocol removes the protocol from the URL.
+// WithoutProtocol removes the protocol from the input.
+//
+// Example:
+//
+//	WithoutProtocol("http://example.com") // example.com
 func WithoutProtocol(input string) string {
 	return WithProtocol(input, "")
 }
 
-// WithProtocol adds or replaces the URL protocol.
+// WithProtocol adds or replaces the protocol from the input.
+//
+// Example:
+//
+//	WithProtocol("http://example.com", "ftp://") // ftp://example.com
 func WithProtocol(input string, protocol string) string {
 	match := protocolRe.FindString(input)
 	if match == "" {
 		leadRe := regexp.MustCompile(`^/{2,}`)
 		match = leadRe.FindString(input)
 	}
+
 	if match == "" {
 		return protocol + input
 	}
+
 	return protocol + input[len(match):]
 }
 
-// NormalizeURL normalises a URL (encode pathname, hash, host; re-stringify query).
+// NormalizeURL normalizes the URL:
+//   - Ensures the URL is properly encoded
+//   - Ensures pathname starts with a slash
+//   - Preserves protocol/host if provided
+//
+// Example:
+//
+//	NormalizeURL("test?query=123 123#hash, test")
+//	// Returns "test?query=123%20123#hash,%20test"
 func NormalizeURL(input string) string {
 	parsed := ParseURL(input, "")
 	parsed.Pathname = EncodePath(DecodePath(parsed.Pathname))
+
 	// Hash includes the leading "#"; encode only the content after it
 	if strings.HasPrefix(parsed.Hash, "#") {
 		parsed.Hash = "#" + EncodeHash(Decode(parsed.Hash[1:]))
 	} else {
 		parsed.Hash = EncodeHash(Decode(parsed.Hash))
 	}
+
 	parsed.Host = EncodeHost(Decode(parsed.Host))
 	qs := StringifyQuery(QueryObject(ParseQuery(parsed.Search)))
+
 	// NormalizeURL uses %20 encoding rather than + for spaces
 	qs = strings.ReplaceAll(qs, "+", "%20")
 	if qs != "" {
@@ -379,10 +579,16 @@ func NormalizeURL(input string) string {
 	} else {
 		parsed.Search = ""
 	}
-	return StringifyParsedURL(parsed)
+
+	return parsed.String()
 }
 
-// ResolveURL resolves URL segments onto a base URL.
+// ResolveURL resolves multiple URL segments into a single URL.
+//
+// Example:
+//
+//	ResolveURL("http://foo.com/foo?test=123#token", "bar", "baz")
+//	// Returns "http://foo.com/foo/bar/baz?test=123#token"
 func ResolveURL(base string, inputs ...string) string {
 	filtered := []string{}
 	for _, inp := range inputs {
@@ -390,28 +596,37 @@ func ResolveURL(base string, inputs ...string) string {
 			filtered = append(filtered, inp)
 		}
 	}
+
 	if len(filtered) == 0 {
 		return base
 	}
+
 	url := ParseURL(base, "")
 	for _, segment := range filtered {
 		seg := ParseURL(segment, "")
+
+		// Append path
 		if seg.Pathname != "" {
-			url.Pathname = WithTrailingSlash(url.Pathname, false) + WithoutLeadingSlash(seg.Pathname)
+			url.Pathname = WithTrailingSlash(
+				url.Pathname,
+				dontRespect,
+			) + WithoutLeadingSlash(seg.Pathname)
 		}
+
+		// Override hash
 		if seg.Hash != "" && seg.Hash != "#" {
 			url.Hash = seg.Hash
 		}
+
+		// Append search
 		if seg.Search != "" && seg.Search != "?" {
 			if url.Search != "" && url.Search != "?" {
 				merged := StringifyQuery(func() QueryObject {
 					m := QueryObject{}
-					for k, v := range ParseQuery(url.Search) {
-						m[k] = v
-					}
-					for k, v := range ParseQuery(seg.Search) {
-						m[k] = v
-					}
+
+					maps.Copy(m, ParseQuery(url.Search))
+					maps.Copy(m, ParseQuery(seg.Search))
+
 					return m
 				}())
 				if merged != "" {
@@ -424,58 +639,119 @@ func ResolveURL(base string, inputs ...string) string {
 			}
 		}
 	}
-	return StringifyParsedURL(url)
+
+	return url.String()
 }
 
-// IsSamePath checks if two paths are equal after decoding and removing trailing slash.
-func IsSamePath(p1 string, p2 string) bool {
-	return Decode(WithoutTrailingSlash(p1, false)) == Decode(WithoutTrailingSlash(p2, false))
+// IsSamePath checks if two paths are equal or not.
+// Trailing slash and encoding are normalized before comparison.
+//
+// Example:
+//
+//	IsSamePath("/foo", "/foo/") // true
+func IsSamePath(a string, b string) bool {
+	return Decode(WithoutTrailingSlash(a, dontRespect)) == Decode(WithoutTrailingSlash(b, dontRespect))
 }
 
-// IsEqual checks if two URLs are equal, with configurable strictness.
-func IsEqual(a string, b string, options CompareURLOptions) bool {
-	if !options.TrailingSlash {
-		a = WithTrailingSlash(a, false)
-		b = WithTrailingSlash(b, false)
+// IsEqual checks if two paths are equal regardless of encoding,
+// trailing slash, and leading slash differences. You can make
+// encoding, trailing slash, or leading slash checks strict by
+// setting the `opts` parameter.
+//
+// Examples:
+//
+//	IsEqual("/foo", "foo", nil) // true
+//	IsEqual("foo/", "foo", nil) // true
+//	IsEqual("/foo bar", "/foo%20bar", nil) // true
+//
+// The same examples, with strict checks:
+//
+//	IsEqual("/foo", "foo", &IsEqualOptions{ LeadingSlash: true }) // false
+//	IsEqual("foo/", "foo", &IsEqualOptions{ TrailingSlash: true }) // false
+//	IsEqual("/foo bar", "/foo%20bar", &IsEqualOptions{ Encoding: true }) // false
+func IsEqual(a string, b string, opts *IsEqualOptions) bool {
+	if opts == nil {
+		opts = &IsEqualOptions{
+			StrictTrailingSlash: false,
+			StrictLeadingSlash:  false,
+			StrictEncoding:      false,
+		}
 	}
-	if !options.LeadingSlash {
+
+	if !opts.StrictTrailingSlash {
+		a = WithTrailingSlash(a, dontRespect)
+		b = WithTrailingSlash(b, dontRespect)
+	}
+	if !opts.StrictLeadingSlash {
 		a = WithLeadingSlash(a)
 		b = WithLeadingSlash(b)
 	}
-	if !options.Encoding {
+	if !opts.StrictEncoding {
 		a = Decode(a)
 		b = Decode(b)
 	}
+
 	return a == b
 }
 
-// WithFragment adds or replaces the hash fragment of a URL.
+type IsEqualOptions struct {
+	// Don't normalize trailing slash.
+	StrictTrailingSlash bool
+	// Don't normalize leading slash.
+	StrictLeadingSlash bool
+	// Don't normalize encoding.
+	StrictEncoding bool
+}
+
+// WithFragment adds or replaces the fragment section
+// of the URL.
+//
+// Examples:
+//
+//	WithFragment("/foo", "bar") // "/foo#bar"
+//	WithFragment("/foo#bar", "baz") // "/foo#bar"
+//	WithFragment("/foo#bar", "") // "/foo"
 func WithFragment(input string, hash string) string {
 	if hash == "#" {
 		return input
 	}
+
 	parsed := ParseURL(input, "")
 	if hash == "" {
 		parsed.Hash = ""
 	} else {
 		parsed.Hash = "#" + EncodeHash(hash)
 	}
-	return StringifyParsedURL(parsed)
+
+	return parsed.String()
 }
 
-// WithoutFragment removes the hash fragment from a URL.
+// WithoutFragment removes the fragment section from the URL.
+//
+// Example:
+//
+//	WithoutFragment("http://example.com/foo?q=123#bar")
+//	// Returns "http://example.com/foo?q=123"
 func WithoutFragment(input string) string {
 	parsed := ParseURL(input, "")
 	parsed.Hash = ""
-	return StringifyParsedURL(parsed)
+
+	return parsed.String()
 }
 
-// WithoutHost removes the host from a URL, preserving path/query/hash.
+// WithoutHost removes the host from the URL while
+// preserving everything else.
+//
+// Example:
+//
+//	WithoutHost("http://example.com/foo?q=123#bar")
+//	// Returns "/foo?q=123#bar"
 func WithoutHost(input string) string {
 	parsed := ParseURL(input, "")
 	pathname := parsed.Pathname
 	if pathname == "" {
 		pathname = "/"
 	}
+
 	return pathname + parsed.Search + parsed.Hash
 }
