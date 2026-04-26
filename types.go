@@ -44,7 +44,7 @@ type ParseFilenameOptions struct {
 }
 
 // QueryValue is any scalar or composite value that can appear in a query string.
-type QueryValue interface{}
+type QueryValue any
 
 // QueryObject is a map of query key to one or more QueryValues.
-type QueryObject map[string]interface{}
+type QueryObject map[string]any
