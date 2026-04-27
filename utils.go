@@ -44,6 +44,13 @@ func IsRelative(inputString string) bool {
 //	HasProtocol("data:text/plain", nil) // true
 //	HasProtocol("data:text/plain", &HasProtocolOptions{ Strict: true }) // false
 func HasProtocol(inputString string, opts *HasProtocolOptions) bool {
+	if opts == nil {
+		opts = &HasProtocolOptions{
+			AcceptRelative: false,
+			Strict:         false,
+		}
+	}
+
 	if opts.Strict {
 		return protocolStrictRe.MatchString(inputString)
 	}
@@ -323,9 +330,9 @@ func WithoutBase(input string, base string) string {
 func WithQuery(input string, query QueryObject) string {
 	parsed := ParseURL(input, "")
 	existing := ParseQuery(parsed.Search)
-	maps.Copy(query, existing)
+	maps.Copy(existing, query)
 
-	qs := StringifyQuery(QueryObject(existing))
+	qs := QueryObject(existing).String()
 	if qs != "" {
 		parsed.Search = "?" + qs
 	} else {
@@ -361,7 +368,7 @@ func FilterQuery(input string, callback func(k string, v any) bool) string {
 		}
 	}
 
-	qs := StringifyQuery(filtered)
+	qs := filtered.String()
 	if qs != "" {
 		parsed.Search = "?" + qs
 	} else {
@@ -570,7 +577,7 @@ func NormalizeURL(input string) string {
 	}
 
 	parsed.Host = EncodeHost(Decode(parsed.Host))
-	qs := StringifyQuery(QueryObject(ParseQuery(parsed.Search)))
+	qs := QueryObject(ParseQuery(parsed.Search)).String()
 
 	// NormalizeURL uses %20 encoding rather than + for spaces
 	qs = strings.ReplaceAll(qs, "+", "%20")
@@ -621,14 +628,15 @@ func ResolveURL(base string, inputs ...string) string {
 		// Append search
 		if seg.Search != "" && seg.Search != "?" {
 			if url.Search != "" && url.Search != "?" {
-				merged := StringifyQuery(func() QueryObject {
+				merged := (func() QueryObject {
 					m := QueryObject{}
 
 					maps.Copy(m, ParseQuery(url.Search))
 					maps.Copy(m, ParseQuery(seg.Search))
 
 					return m
-				}())
+				}()).String()
+
 				if merged != "" {
 					url.Search = "?" + merged
 				} else {
