@@ -24,10 +24,12 @@ func ParsePath(input string) ParsedPath {
 	if input == "" {
 		return ParsedPath{}
 	}
+
 	m := pathSplitRe.FindStringSubmatch(input)
 	if m == nil {
 		return ParsedPath{Pathname: input}
 	}
+
 	return ParsedPath{
 		Pathname: m[1],
 		Search:   m[2],
@@ -84,6 +86,7 @@ func ParseURL(input string, defaultProto string) ParsedURL {
 		host = hm[1]
 		path = hm[2]
 	}
+
 	// 'file:' protocol strips leading slash before drive letter
 	if strings.ToLower(protocol) == "file:" {
 		path = driveLetterRe.ReplaceAllString(path, "$1")
@@ -167,7 +170,7 @@ func (url ParsedURL) String() string {
 var _ fmt.Stringer = (*ParsedURL)(nil)
 
 // ParseFilename returns the last path segment from the URL's pathname.
-// With opts.Strict = true, only returns a name that contains a dot.
+// With `opts.Strict` = true, only returns a name that contains a dot.
 func ParseFilename(input string, opts ParseFilenameOptions) string {
 	parsed := ParseURL(input, "")
 
