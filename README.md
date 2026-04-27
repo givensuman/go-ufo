@@ -8,564 +8,417 @@ This is a port of the [unjs.io/ufo](https://unjs.io/packages/ufo) package to Go.
 
 ## Install
 
-Install using npm or your favourite package manager:
-
-Install package:
-
-```sh
-# npm
-npm install ufo
-
-# yarn
-yarn add ufo
-
-# pnpm
-pnpm install ufo
-
-# bun
-bun install ufo
+```bash
+go get github.com/givensuman/go-ufo
 ```
 
-Import utils:
+Import:
 
-```js
-// ESM
-import { normalizeURL, joinURL } from "ufo";
-
-// CommonJS
-const { normalizeURL, joinURL } = require("ufo");
-
-// Deno
-import { parseURL } from "https://unpkg.com/ufo/dist/index.mjs";
+```go
+import (
+  "github.com/givensuman/go-ufo"
+)
 ```
-
-<!-- automd:jsdocs src=./src defaultGroup=utils -->
 
 ## Encoding Utils
 
-### `decode(text)`
-
-Decodes text using `decodeURIComponent`. Returns the original text if it fails.
-
-### `decodePath(text)`
-
-Decodes path section of URL (consistent with encodePath for slash encoding).
-
-### `decodeQueryKey(text)`
-
-Decodes query key (consistent with `encodeQueryKey` for plus encoding).
-
-### `decodeQueryValue(text)`
-
-Decodes query value (consistent with `encodeQueryValue` for plus encoding).
-
-### `encode(text)`
+### `Encode(text string) string`
 
 Encodes characters that need to be encoded in the path, search and hash sections of the URL.
 
-### `encodeHash(text)`
+### `Decode(text string) string`
+
+Decodes text, returning the original text if decoding fails.
+
+### `DecodePath(text string) string`
+
+Decodes path section of the URL, consistent with `EncodePath`.
+
+### `DecodeQueryKey(text string) string`
+
+Decodes query key, consistent with `EncodeQueryKey`.
+
+### `DecodeQueryValue(text string) string`
+
+Decodes query value, consistent with `EncodeQueryValue`.
+
+### `EncodeHash(text string) string`
 
 Encodes characters that need to be encoded in the hash section of the URL.
 
-### `encodeHost(name)`
-
-Encodes hostname with punycode encoding.
-
-### `encodeParam(text)`
-
-Encodes characters that need to be encoded in the path section of the URL as a param. This function encodes everything `encodePath` does plus the slash (`/`) character.
-
-### `encodePath(text)`
+### `EncodePath(text string) string`
 
 Encodes characters that need to be encoded in the path section of the URL.
 
-### `encodeQueryKey(text)`
+### `EncodeParam(text string) string`
 
-Encodes characters that need to be encoded for query values in the query section of the URL and also encodes the `=` character.
+Encodes characters that need to be encoded in the path section of the URL as a param. Also encodes the slash (`/`) character.
 
-### `encodeQueryValue(input)`
+### `EncodeQueryValue(input string) string`
 
 Encodes characters that need to be encoded for query values in the query section of the URL.
 
+### `EncodeQueryKey(text string) string`
+
+Encodes characters that need to be encoded for query keys in the query section of the URL and also encodes the `=` character.
+
+### `EncodeHost(name string) string`
+
+Encodes hostname with punycode encoding, returning the original name if encoding fails.
+
 ## Parsing Utils
 
-### `parseAuth(input)`
+### `ParsePath(input string) ParsedPath`
 
-Takes a string of the form `username:password` and returns an object with the username and password decoded.
+Splits an input string into pathname, search, and hash:
 
-### `parseFilename(input, opts?: { strict? })`
-
-Parses a URL and returns last segment in path as filename.
-
-If `{ strict: true }` is passed as the second argument, it will only return the last segment only if ending with an extension.
-
-**Example:**
-
-```js
-// Result: filename.ext
-parseFilename("http://example.com/path/to/filename.ext");
-
-// Result: undefined
-parseFilename("/path/to/.hidden-file", { strict: true });
+```go
+ParsePath("http://foo.com/foo?test=123#token")
+// ParsedPath{ Pathname: "http://foo.com/foo", Search: "?test=123", Hash: "#token" }
 ```
 
-### `parseHost(input)`
+### `ParseURL(input string, defaultProto string) ParsedURL`
 
-Takes a string, and returns an object with two properties: `hostname` and `port`.
+Parses a URL string into a `ParsedURL`. If the input has no protocol and `defaultProto` is non-empty, it is prepended:
 
-**Example:**
+```go
+ParseURL("http://foo.com/foo?test=123#token", "")
+// ParsedURL{ Protocol: "http:", Host: "foo.com", Pathname: "/foo", Search: "?test=123", Hash: "#token" }
 
-```js
-parseHost("foo.com:8080");
-// { hostname: 'foo.com', port: '8080' }
+ParseURL("foo.com/foo?test=123#token", "")
+// ParsedURL{ Pathname: "foo.com/foo", Search: "?test=123", Hash: "#token" }
+
+ParseURL("foo.com/foo?test=123#token", "https://")
+// ParsedURL{ Protocol: "https:", Host: "foo.com", Pathname: "/foo", Search: "?test=123", Hash: "#token" }
 ```
 
-### `parsePath(input)`
+`ParsedURL` implements `fmt.Stringer`, so you can call `.String()` to reconstruct the URL.
 
-Splits the input string into three parts, and returns an object with those three parts.
+### `ParseAuth(input string) ParsedAuth`
 
-**Example:**
+Splits a `username:password` string into its components:
 
-```js
-parsePath("http://foo.com/foo?test=123#token");
-// { pathname: 'http://foo.com/foo', search: '?test=123', hash: '#token' }
+```go
+ParseAuth("user:pass")
+// ParsedAuth{ Username: "user", Password: "pass" }
 ```
 
-### `parseURL(input, defaultProto?)`
+### `ParseHost(input string) ParsedHost`
 
-Takes a URL string and returns an object with the URL's `protocol`, `auth`, `host`, `pathname`, `search`, and `hash`.
+Splits a `hostname:port` string into its components:
 
-**Example:**
-
-```js
-parseURL("http://foo.com/foo?test=123#token");
-// { protocol: 'http:', auth: '', host: 'foo.com', pathname: '/foo', search: '?test=123', hash: '#token' }
-
-parseURL("foo.com/foo?test=123#token");
-// { pathname: 'foo.com/foo', search: '?test=123', hash: '#token' }
-
-parseURL("foo.com/foo?test=123#token", "https://");
-// { protocol: 'https:', auth: '', host: 'foo.com', pathname: '/foo', search: '?test=123', hash: '#token' }
+```go
+ParseHost("foo.com:8080")
+// ParsedHost{ Hostname: "foo.com", Port: "8080" }
 ```
 
-### `stringifyParsedURL(parsed)`
+### `ParseFilename(input string, opts ParseFilenameOptions) string`
 
-Takes a `ParsedURL` object and returns the stringified URL.
+Returns the last path segment from the URL's pathname. With `opts.Strict = true`, only returns a name that contains a dot (extension):
 
-**Example:**
+```go
+ParseFilename("http://example.com/path/to/filename.ext", ParseFilenameOptions{})
+// "filename.ext"
 
-```js
-const obj = parseURL("http://foo.com/foo?test=123#token");
-obj.host = "bar.com";
-
-stringifyParsedURL(obj); // "http://bar.com/foo?test=123#token"
+ParseFilename("/path/to/.hidden-file", ParseFilenameOptions{ Strict: true })
+// ""
 ```
 
 ## Query Utils
 
-### `encodeQueryItem(key, value)`
+### `ParseQuery(parametersString string) map[string]any`
 
-Encodes a pair of key and value into a url query string value.
+Parses and decodes a query string into a map. The input can include or omit the leading `?`:
 
-If the value is an array, it will be encoded as multiple key-value pairs with the same key.
+```go
+ParseQuery("?foo=bar&baz=qux")
+// map[string]any{ "foo": "bar", "baz": "qux" }
 
-**Example:**
-
-```js
-encodeQueryItem('message', 'Hello World')
-// 'message=Hello+World'
-
-encodeQueryItem('tags', ['javascript', 'web', 'dev'])
-// 'tags=javascript&tags=web&tags=dev'
+ParseQuery("tags=javascript&tags=web&tags=dev")
+// map[string]any{ "tags": []string{"javascript", "web", "dev"} }
 ```
 
-### `parseQuery(parametersString)`
+### `EncodeQueryItem(key string, value any) string`
 
-Parses and decodes a query string into an object.
+Encodes a key-value pair into a URL query string. If the value is a `[]any`, it is encoded as multiple key-value pairs with the same key:
 
-The input can be a query string with or without the leading `?`.
+```go
+EncodeQueryItem("message", "Hello World")
+// "message=Hello+World"
 
-**Example:**
-
-```js
-parseQuery("?foo=bar&baz=qux");
-// { foo: "bar", baz: "qux" }
-
-parseQuery("tags=javascript&tags=web&tags=dev");
-// { tags: ["javascript", "web", "dev"] }
-```
-
-### `stringifyQuery(query)`
-
-Stringfies and encodes a query object into a query string.
-
-**Example:**
-
-```js
-stringifyQuery({ foo: 'bar', baz: 'qux' })
-// 'foo=bar&baz=qux'
-
-stringifyQuery({ foo: 'bar', baz: undefined })
-// 'foo=bar'
+EncodeQueryItem("tags", []any{"javascript", "web", "dev"})
+// "tags=javascript&tags=web&tags=dev"
 ```
 
 ## Utils
 
-### `$URL()`
+### `CleanDoubleSlashes(input string) string`
 
-### `cleanDoubleSlashes(input)`
+Removes double slashes from the URL:
 
-Removes double slashes from the URL.
+```go
+CleanDoubleSlashes("//foo//bar//") // "/foo/bar/"
 
-**Example:**
-
-```js
-cleanDoubleSlashes("//foo//bar//"); // "/foo/bar/"
-
-cleanDoubleSlashes("http://example.com/analyze//http://localhost:3000//");
-// Returns "http://example.com/analyze/http://localhost:3000/"
+CleanDoubleSlashes("http://example.com/analyze//http://localhost:3000//")
+// "http://example.com/analyze/http://localhost:3000/"
 ```
 
-### `filterQuery(input, predicate)`
+### `FilterQuery(input string, callback func(k string, v any) bool) string`
 
-Removes the query section of the URL.
+Filters query params of the URL using a predicate:
 
-**Example:**
-
-```js
-filterQuery("/foo?bar=1&baz=2", (key) => key !== "bar"); // "/foo?baz=2"
+```go
+FilterQuery("/foo?bar=1&baz=2", func(k string, v any) bool {
+    return k != "bar"
+}) // "/foo?baz=2"
 ```
 
-### `getQuery(input)`
+### `GetQuery(input string) map[string]any`
 
-Parses and decodes the query object of an input URL into an object.
+Parses and decodes the query object of an input URL into a map:
 
-**Example:**
-
-```js
-getQuery("http://foo.com/foo?test=123&unicode=%E5%A5%BD");
-// { test: "123", unicode: "好" }
+```go
+GetQuery("http://foo.com/foo?test=123&unicode=%E5%A5%BD")
+// map[string]any{ "test": "123", "unicode": "好" }
 ```
 
-### `hasLeadingSlash(input)`
+### `HasLeadingSlash(input string) bool`
 
-Checks if the input has a leading slash (e.g. `/foo`).
+Checks if the input has a leading slash:
 
-### `hasProtocol(inputString, opts)`
-
-Checks if the input has a protocol.
-
-You can use `{ acceptRelative: true }` to accept relative URLs as valid protocol.
-
-**Example:**
-
-```js
-hasProtocol('https://example.com'); // true
-
-hasProtocol("//example.com"); // false
-
-hasProtocol('//example.com', { acceptRelative: true });  // true
-
-hasProtocol("ftp://example.com"); // true
-
-hasProtocol('data:text/plain'); // true
-
-hasProtocol('data:text/plain', { strict: true }); // false
+```go
+HasLeadingSlash("/foo") // true
 ```
 
-### `hasTrailingSlash(input, respectQueryAndFragment?)`
+### `HasProtocol(inputString string, opts *HasProtocolOptions) bool`
 
-Checks if the input has a trailing slash.
+Checks if the input has a protocol. Use `opts.AcceptRelative = true` to accept relative URLs, and `opts.Strict = true` for strict RFC 3986 protocol matching:
 
-**Example:**
-
-```js
-hasTrailingSlash("/foo/"); // true
-
-hasTrailingSlash("/foo"); // false
-
-hasTrailingSlash("/foo?query=true", true); // false
-
-hasTrailingSlash("/foo/?query=true", true); // true
+```go
+HasProtocol("https://example.com", nil) // true
+HasProtocol("//example.com", nil) // false
+HasProtocol("//example.com", &HasProtocolOptions{ AcceptRelative: true }) // true
+HasProtocol("data:text/plain", nil) // true
+HasProtocol("data:text/plain", &HasProtocolOptions{ Strict: true }) // false
 ```
 
-### `isEmptyURL(url)`
+### `HasTrailingSlash(input string, respectQueryAndFragment *RespectQueryAndFragmentOption) bool`
+
+Checks if the input has a trailing slash:
+
+```go
+HasTrailingSlash("/foo/", nil) // true
+HasTrailingSlash("/foo", nil) // false
+HasTrailingSlash("/foo?query=true", &RespectQueryAndFragmentOption{ true }) // false
+HasTrailingSlash("/foo/?query=true", &RespectQueryAndFragmentOption{ true }) // true
+```
+
+### `IsEmptyURL(url string) bool`
 
 Checks if the input URL is empty or `/`.
 
-### `isEqual(a, b, options)`
+### `IsEqual(a string, b string, opts *IsEqualOptions) bool`
 
-Checks if two paths are equal regardless of encoding, trailing slash, and leading slash differences.
+Checks if two paths are equal regardless of encoding, trailing slash, and leading slash differences. Use `opts` for strict comparisons:
 
-You can make slash check strict by setting `{ trailingSlash: true, leadingSlash: true }` as options.
+```go
+IsEqual("/foo", "foo", nil) // true
+IsEqual("foo/", "foo", nil) // true
+IsEqual("/foo bar", "/foo%20bar", nil) // true
 
-You can make encoding check strict by setting `{ encoding: true }` as options.
-
-**Example:**
-
-```js
-isEqual("/foo", "foo"); // true
-isEqual("foo/", "foo"); // true
-isEqual("/foo bar", "/foo%20bar"); // true
-
-// Strict compare
-isEqual("/foo", "foo", { leadingSlash: true }); // false
-isEqual("foo/", "foo", { trailingSlash: true }); // false
-isEqual("/foo bar", "/foo%20bar", { encoding: true }); // false
+// Strict comparisons
+IsEqual("/foo", "foo", &IsEqualOptions{ StrictLeadingSlash: true }) // false
+IsEqual("foo/", "foo", &IsEqualOptions{ StrictTrailingSlash: true }) // false
+IsEqual("/foo bar", "/foo%20bar", &IsEqualOptions{ StrictEncoding: true }) // false
 ```
 
-### `isNonEmptyURL(url)`
+### `IsNonEmptyURL(url string) bool`
 
 Checks if the input URL is neither empty nor `/`.
 
-### `isRelative(inputString)`
+### `IsRelative(inputString string) bool`
 
-Check if a path starts with `./` or `../`.
+Checks if a path starts with `./` or `../`:
 
-**Example:**
-
-```js
-isRelative("./foo"); // true
+```go
+IsRelative("./foo") // true
 ```
 
-### `isSamePath(p1, p2)`
+### `IsSamePath(a string, b string) bool`
 
-Check if two paths are equal or not. Trailing slash and encoding are normalized before comparison.
+Checks if two paths are equal. Trailing slash and encoding are normalized before comparison:
 
-**Example:**
-
-```js
-isSamePath("/foo", "/foo/"); // true
+```go
+IsSamePath("/foo", "/foo/") // true
 ```
 
-### `isScriptProtocol(protocol?)`
+### `IsScriptProtocol(protocol string) bool`
 
-Checks if the input protocol is any of the dangerous `blob:`, `data:`, `javascript`: or `vbscript:` protocols.
+Checks if the input is any of the dangerous `blob:`, `data:`, `javascript:`, or `vbscript:` protocols:
 
-**Example:**
-
-```js
-isScriptProtocol("javascript:alert(1)"); // true
-
-isScriptProtocol("data:text/html,hello"); // true
-
-isScriptProtocol("blob:hello"); // true
-
-isScriptProtocol("vbscript:alert(1)"); // true
-
-isScriptProtocol("https://example.com"); // false
+```go
+IsScriptProtocol("javascript:alert(1)") // true
+IsScriptProtocol("https://example.com") // false
 ```
 
-### `joinRelativeURL()`
+### `JoinRelativeURL(input ...string) string`
 
-Joins multiple URL segments into a single URL and also handles relative paths with `./` and `../`.
+Joins multiple URL segments into a single URL, handling relative paths with `./` and `../`:
 
-**Example:**
-
-```js
-joinRelativeURL("/a", "../b", "./c"); // "/b/c"
+```go
+JoinRelativeURL("/a", "../b", "./c") // "/b/c"
 ```
 
-### `joinURL(base)`
+### `JoinURL(base string, input ...string) string`
 
-Joins multiple URL segments into a single URL.
+Joins multiple URL segments into a single URL:
 
-**Example:**
-
-```js
-joinURL("a", "/b", "/c"); // "a/b/c"
+```go
+JoinURL("a", "/b", "/c") // "a/b/c"
 ```
 
-### `normalizeURL(input)`
+### `NormalizeURL(input string) string`
 
-Normalizes the input URL:
+Normalizes the input URL by ensuring proper encoding and that the pathname starts with a slash:
 
-- Ensures the URL is properly encoded - Ensures pathname starts with a slash - Preserves protocol/host if provided
-
-**Example:**
-
-```js
-normalizeURL("test?query=123 123#hash, test");
-// Returns "test?query=123%20123#hash,%20test"
-
-normalizeURL("http://localhost:3000");
-// Returns "http://localhost:3000"
+```go
+NormalizeURL("test?query=123 123#hash, test")
+// "test?query=123%20123#hash,%20test"
 ```
 
-### `resolveURL(base)`
+### `ResolveURL(base string, inputs ...string) string`
 
-Resolves multiple URL segments into a single URL.
+Resolves multiple URL segments into a single URL:
 
-**Example:**
-
-```js
-resolveURL("http://foo.com/foo?test=123#token", "bar", "baz");
-// Returns "http://foo.com/foo/bar/baz?test=123#token"
+```go
+ResolveURL("http://foo.com/foo?test=123#token", "bar", "baz")
+// "http://foo.com/foo/bar/baz?test=123#token"
 ```
 
-### `withBase(input, base)`
+### `WithBase(input string, base string) string`
 
-Ensures the URL or pathname starts with base.
+Ensures the URL or pathname starts with base:
 
-If input already starts with base, it will not be added again.
-
-**Example:**
-
-```js
-withBase("/foo/bar", "/foo"); // "/foo/bar"
-
-withBase("/foo/bar", "/baz"); // "/baz/foo/bar"
+```go
+WithBase("/foo/bar", "/foo") // "/foo/bar"
+WithBase("/foo/bar", "/baz") // "/baz/foo/bar"
 ```
 
-### `withFragment(input, hash)`
+### `WithFragment(input string, hash string) string`
 
-Adds or replaces the fragment section of the URL.
+Adds or replaces the fragment section of the URL:
 
-**Example:**
-
-```js
-withFragment("/foo", "bar"); // "/foo#bar"
-withFragment("/foo#bar", "baz"); // "/foo#baz"
-withFragment("/foo#bar", ""); // "/foo"
+```go
+WithFragment("/foo", "bar") // "/foo#bar"
+WithFragment("/foo#bar", "baz") // "/foo#baz"
+WithFragment("/foo#bar", "") // "/foo"
 ```
 
-### `withHttp(input)`
+### `WithHTTP(input string) string`
 
-Adds or replaces the URL protocol to `http://`.
+Adds or replaces the URL protocol with `http://`:
 
-**Example:**
-
-```js
-withHttp("https://example.com"); // http://example.com
+```go
+WithHTTP("https://example.com") // "http://example.com"
 ```
 
-### `withHttps(input)`
+### `WithHTTPS(input string) string`
 
-Adds or replaces the URL protocol to `https://`.
+Adds or replaces the URL protocol with `https://`:
 
-**Example:**
-
-```js
-withHttps("http://example.com"); // https://example.com
+```go
+WithHTTPS("http://example.com") // "https://example.com"
 ```
 
-### `withLeadingSlash(input)`
+### `WithLeadingSlash(input string) string`
 
-Ensures the URL or pathname has a leading slash.
+Ensures the URL or pathname has a leading slash:
 
-**Example:**
-
-```js
-withLeadingSlash("foo"); // "/foo"
+```go
+WithLeadingSlash("foo") // "/foo"
 ```
 
-### `withoutBase(input, base)`
+### `WithoutBase(input string, base string) string`
 
-Removes the base from the URL or pathname.
+Removes the base from the URL or pathname:
 
-If input does not start with base, it will not be removed.
-
-**Example:**
-
-```js
-withoutBase("/foo/bar", "/foo"); // "/bar"
+```go
+WithoutBase("/foo/bar", "/foo") // "/bar"
 ```
 
-### `withoutFragment(input)`
+### `WithoutFragment(input string) string`
 
-Removes the fragment section from the URL.
+Removes the fragment section from the URL:
 
-**Example:**
-
-```js
-withoutFragment("http://example.com/foo?q=123#bar")
-// Returns "http://example.com/foo?q=123"
+```go
+WithoutFragment("http://example.com/foo?q=123#bar")
+// "http://example.com/foo?q=123"
 ```
 
-### `withoutHost(input)`
+### `WithoutHost(input string) string`
 
-Removes the host from the URL while preserving everything else.
+Removes the host from the URL while preserving everything else:
 
-**Example:**
-
-```js
-withoutHost("http://example.com/foo?q=123#bar")
-// Returns "/foo?q=123#bar"
+```go
+WithoutHost("http://example.com/foo?q=123#bar")
+// "/foo?q=123#bar"
 ```
 
-### `withoutLeadingSlash(input)`
+### `WithoutLeadingSlash(input string) string`
 
-Removes leading slash from the URL or pathname.
+Removes the leading slash from the URL or pathname:
 
-**Example:**
-
-```js
-withoutLeadingSlash("/foo"); // "foo"
+```go
+WithoutLeadingSlash("/foo") // "foo"
 ```
 
-### `withoutProtocol(input)`
+### `WithoutProtocol(input string) string`
 
-Removes the protocol from the input.
+Removes the protocol from the input:
 
-**Example:**
-
-```js
-withoutProtocol("http://example.com"); // "example.com"
+```go
+WithoutProtocol("http://example.com") // "example.com"
 ```
 
-### `withoutTrailingSlash(input, respectQueryAndFragment?)`
+### `WithoutTrailingSlash(input string, respectQueryAndFragment *RespectQueryAndFragmentOption) string`
 
-Removes the trailing slash from the URL or pathname.
+Removes the trailing slash from the URL or pathname:
 
-If second argument is `true`, it will only remove the trailing slash if it's not part of the query or fragment with cost of more expensive operations.
-
-**Example:**
-
-```js
-withoutTrailingSlash("/foo/"); // "/foo"
-
-withoutTrailingSlash("/path/?query=true", true); // "/path?query=true"
+```go
+WithoutTrailingSlash("/foo/", nil) // "/foo"
+WithoutTrailingSlash("/path/?query=true", &RespectQueryAndFragmentOption{ true }) // "/path?query=true"
 ```
 
-### `withProtocol(input, protocol)`
+### `WithProtocol(input string, protocol string) string`
 
-Adds or replaces protocol of the input URL.
+Adds or replaces the protocol of the input URL:
 
-**Example:**
-
-```js
-withProtocol("http://example.com", "ftp://"); // "ftp://example.com"
+```go
+WithProtocol("http://example.com", "ftp://") // "ftp://example.com"
 ```
 
-### `withQuery(input, query)`
+### `WithQuery(input string, query QueryObject) string`
 
-Add/Replace the query section of the URL.
+Adds or replaces query params of the URL:
 
-**Example:**
-
-```js
-withQuery("/foo?page=a", { token: "secret" }); // "/foo?page=a&token=secret"
+```go
+WithQuery("/foo?page=a", QueryObject{ "token": "secret" })
+// "/foo?page=a&token=secret"
 ```
 
-### `withTrailingSlash(input, respectQueryAndFragment?)`
+### `WithTrailingSlash(input string, respectQueryAndFragment *RespectQueryAndFragmentOption) string`
 
-Ensures the URL ends with a trailing slash.
+Ensures the URL ends with a trailing slash:
 
-If second argument is `true`, it will only add the trailing slash if it's not part of the query or fragment with cost of more expensive operation.
-
-**Example:**
-
-```js
-withTrailingSlash("/foo"); // "/foo/"
-
-withTrailingSlash("/path?query=true", true); // "/path/?query=true"
+```go
+WithTrailingSlash("/foo", nil) // "/foo/"
+WithTrailingSlash("/path?query=true", &RespectQueryAndFragmentOption{ true }) // "/path/?query=true"
 ```
 
 ## Why?
 
-I'm a fan of the [unjs.io](unjs.io) ecosystem, particularly their excellent API design. So I thought why not Go?
+I'm a fan of the [unjs.io](https://unjs.io) ecosystem, particularly their excellent API design. So I thought why not Go?
 
 ## License
 
 [MIT](./LICENSE)
-
