@@ -6,6 +6,9 @@
 
 This is a port of the [unjs.io/ufo](https://unjs.io/packages/ufo) package to Go.
 
+Please note function implementations aim for interoperability with JavaScript. If you're looking for 
+pure Go just use [net/url](https://pkg.go.dev/net/url).
+
 ## Install
 
 ```bash
