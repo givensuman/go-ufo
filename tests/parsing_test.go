@@ -75,13 +75,13 @@ func TestParseHost(t *testing.T) {
 func TestStringifyParsedURL(t *testing.T) {
 	p := ufo.ParseURL("http://foo.com/foo?test=123#token", "")
 	p.Host = "bar.com"
-	got := ufo.StringifyParsedURL(p)
+	got := p.String()
 	if got != "http://bar.com/foo?test=123#token" {
 		t.Errorf("StringifyParsedURL = %q, want %q", got, "http://bar.com/foo?test=123#token")
 	}
 	// Protocol-relative
 	p2 := ufo.ParseURL("//foo.com/path", "")
-	got2 := ufo.StringifyParsedURL(p2)
+	got2 := p2.String()
 	if got2 != "//foo.com/path" {
 		t.Errorf("StringifyParsedURL proto-relative = %q, want %q", got2, "//foo.com/path")
 	}

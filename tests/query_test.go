@@ -32,14 +32,14 @@ func TestParseQuery(t *testing.T) {
 
 func TestStringifyQuery(t *testing.T) {
 	q := ufo.QueryObject{"foo": "bar", "baz": "qux"}
-	got := ufo.StringifyQuery(q)
+	got := q.String()
 	// Order is not guaranteed for maps, so check both parts present
 	if !strings.Contains(got, "foo=bar") || !strings.Contains(got, "baz=qux") {
 		t.Errorf("StringifyQuery = %q", got)
 	}
 	// nil values are omitted
 	q2 := ufo.QueryObject{"a": "1", "b": nil}
-	got2 := ufo.StringifyQuery(q2)
+	got2 := q2.String()
 	if got2 != "a=1" {
 		t.Errorf("StringifyQuery nil value = %q, want %q", got2, "a=1")
 	}
@@ -50,7 +50,7 @@ func TestEncodeQueryItem(t *testing.T) {
 		t.Errorf("EncodeQueryItem = %q, want %q", got, "message=Hello+World")
 	}
 	// array value
-	got := ufo.EncodeQueryItem("tags", []interface{}{"js", "web", "dev"})
+	got := ufo.EncodeQueryItem("tags", []any{"js", "web", "dev"})
 	if got != "tags=js&tags=web&tags=dev" {
 		t.Errorf("EncodeQueryItem array = %q, want %q", got, "tags=js&tags=web&tags=dev")
 	}

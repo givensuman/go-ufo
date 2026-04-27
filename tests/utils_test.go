@@ -7,22 +7,22 @@ import (
 )
 
 func TestHasProtocol(t *testing.T) {
-	if !ufo.HasProtocol("https://example.com", ufo.HasProtocolOptions{}) {
+	if !ufo.HasProtocol("https://example.com", nil) {
 		t.Error("HasProtocol https should be true")
 	}
-	if ufo.HasProtocol("//example.com", ufo.HasProtocolOptions{}) {
+	if ufo.HasProtocol("//example.com", nil) {
 		t.Error("HasProtocol // without acceptRelative should be false")
 	}
-	if !ufo.HasProtocol("//example.com", ufo.HasProtocolOptions{AcceptRelative: true}) {
+	if !ufo.HasProtocol("//example.com", &ufo.HasProtocolOptions{AcceptRelative: true}) {
 		t.Error("HasProtocol // with acceptRelative should be true")
 	}
-	if !ufo.HasProtocol("ftp://example.com", ufo.HasProtocolOptions{}) {
+	if !ufo.HasProtocol("ftp://example.com", nil) {
 		t.Error("HasProtocol ftp should be true")
 	}
-	if ufo.HasProtocol("data:text/plain", ufo.HasProtocolOptions{Strict: true}) {
+	if ufo.HasProtocol("data:text/plain", &ufo.HasProtocolOptions{Strict: true}) {
 		t.Error("HasProtocol data strict should be false")
 	}
-	if !ufo.HasProtocol("data:text/plain", ufo.HasProtocolOptions{}) {
+	if !ufo.HasProtocol("data:text/plain", nil) {
 		t.Error("HasProtocol data non-strict should be true")
 	}
 }
@@ -39,42 +39,42 @@ func TestIsScriptProtocol(t *testing.T) {
 }
 
 func TestHasTrailingSlash(t *testing.T) {
-	if !ufo.HasTrailingSlash("/foo/", false) {
+	if !ufo.HasTrailingSlash("/foo/", &ufo.RespectQueryAndFragmentOption{RespectQueryAndFragment: false}) {
 		t.Error("/foo/ should have trailing slash")
 	}
-	if ufo.HasTrailingSlash("/foo", false) {
+	if ufo.HasTrailingSlash("/foo", &ufo.RespectQueryAndFragmentOption{RespectQueryAndFragment: false}) {
 		t.Error("/foo should not have trailing slash")
 	}
-	if ufo.HasTrailingSlash("/foo?q=1", true) {
+	if ufo.HasTrailingSlash("/foo?q=1", &ufo.RespectQueryAndFragmentOption{RespectQueryAndFragment: false}) {
 		t.Error("/foo?q=1 respectQuery — no trailing slash")
 	}
-	if !ufo.HasTrailingSlash("/foo/?q=1", true) {
+	if !ufo.HasTrailingSlash("/foo/?q=1", &ufo.RespectQueryAndFragmentOption{RespectQueryAndFragment: false}) {
 		t.Error("/foo/?q=1 respectQuery — has trailing slash")
 	}
 }
 
 func TestWithoutTrailingSlash(t *testing.T) {
-	if got := ufo.WithoutTrailingSlash("/foo/", false); got != "/foo" {
+	if got := ufo.WithoutTrailingSlash("/foo/", &ufo.RespectQueryAndFragmentOption{RespectQueryAndFragment: false}); got != "/foo" {
 		t.Errorf("WithoutTrailingSlash = %q, want %q", got, "/foo")
 	}
-	if got := ufo.WithoutTrailingSlash("/path/?query=true", true); got != "/path?query=true" {
+	if got := ufo.WithoutTrailingSlash("/path/?query=true", &ufo.RespectQueryAndFragmentOption{RespectQueryAndFragment: true}); got != "/path?query=true" {
 		t.Errorf("WithoutTrailingSlash respect = %q, want %q", got, "/path?query=true")
 	}
 	// no trailing slash → unchanged
-	if got := ufo.WithoutTrailingSlash("/foo", false); got != "/foo" {
+	if got := ufo.WithoutTrailingSlash("/foo", &ufo.RespectQueryAndFragmentOption{RespectQueryAndFragment: false}); got != "/foo" {
 		t.Errorf("WithoutTrailingSlash no-op = %q, want %q", got, "/foo")
 	}
 }
 
 func TestWithTrailingSlash(t *testing.T) {
-	if got := ufo.WithTrailingSlash("/foo", false); got != "/foo/" {
+	if got := ufo.WithTrailingSlash("/foo", &ufo.RespectQueryAndFragmentOption{RespectQueryAndFragment: false}); got != "/foo/" {
 		t.Errorf("WithTrailingSlash = %q, want %q", got, "/foo/")
 	}
-	if got := ufo.WithTrailingSlash("/path?q=1", true); got != "/path/?q=1" {
+	if got := ufo.WithTrailingSlash("/path?q=1", &ufo.RespectQueryAndFragmentOption{RespectQueryAndFragment: true}); got != "/path/?q=1" {
 		t.Errorf("WithTrailingSlash respect = %q, want %q", got, "/path/?q=1")
 	}
 	// already has trailing slash → unchanged
-	if got := ufo.WithTrailingSlash("/foo/", false); got != "/foo/" {
+	if got := ufo.WithTrailingSlash("/foo/", &ufo.RespectQueryAndFragmentOption{RespectQueryAndFragment: false}); got != "/foo/" {
 		t.Errorf("WithTrailingSlash already = %q, want %q", got, "/foo/")
 	}
 }
@@ -180,7 +180,6 @@ func TestWithoutProtocol(t *testing.T) {
 
 func TestWithQuery(t *testing.T) {
 	got := ufo.WithQuery("/foo?page=a", ufo.QueryObject{"token": "secret"})
-	// order not guaranteed, check both params present
 	if got != "/foo?page=a&token=secret" && got != "/foo?token=secret&page=a" {
 		t.Errorf("WithQuery = %q", got)
 	}
@@ -197,14 +196,14 @@ func TestGetQuery(t *testing.T) {
 }
 
 func TestFilterQuery(t *testing.T) {
-	got := ufo.FilterQuery("/foo?bar=1&baz=2", func(key string, value interface{}) bool {
+	got := ufo.FilterQuery("/foo?bar=1&baz=2", func(key string, value any) bool {
 		return key != "bar"
 	})
 	if got != "/foo?baz=2" {
 		t.Errorf("FilterQuery = %q, want %q", got, "/foo?baz=2")
 	}
 	// no query → unchanged
-	if got2 := ufo.FilterQuery("/foo", func(k string, v interface{}) bool { return true }); got2 != "/foo" {
+	if got2 := ufo.FilterQuery("/foo", func(k string, v any) bool { return true }); got2 != "/foo" {
 		t.Errorf("FilterQuery no query = %q", got2)
 	}
 }
@@ -235,13 +234,13 @@ func TestIsSamePath(t *testing.T) {
 }
 
 func TestIsEqual(t *testing.T) {
-	if !ufo.IsEqual("/foo", "foo", ufo.CompareURLOptions{}) {
+	if !ufo.IsEqual("/foo", "foo", nil) {
 		t.Error("IsEqual /foo foo default")
 	}
-	if !ufo.IsEqual("/foo bar", "/foo%20bar", ufo.CompareURLOptions{}) {
+	if !ufo.IsEqual("/foo bar", "/foo%20bar", nil) {
 		t.Error("IsEqual encoding default")
 	}
-	if ufo.IsEqual("/foo", "foo", ufo.CompareURLOptions{LeadingSlash: true}) {
+	if ufo.IsEqual("/foo", "foo", &ufo.IsEqualOptions{StrictLeadingSlash: true}) {
 		t.Error("IsEqual strict leading should differ")
 	}
 }
