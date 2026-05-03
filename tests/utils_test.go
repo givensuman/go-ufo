@@ -179,7 +179,7 @@ func TestWithoutProtocol(t *testing.T) {
 }
 
 func TestWithQuery(t *testing.T) {
-	got := ufo.WithQuery("/foo?page=a", ufo.QueryObject{"token": "secret"})
+	got := ufo.WithQuery("/foo?page=a", ufo.QueryObject{"token": {"secret"}})
 	if got != "/foo?page=a&token=secret" && got != "/foo?token=secret&page=a" {
 		t.Errorf("WithQuery = %q", got)
 	}
@@ -187,23 +187,23 @@ func TestWithQuery(t *testing.T) {
 
 func TestGetQuery(t *testing.T) {
 	q := ufo.GetQuery("http://foo.com/foo?test=123&unicode=%E5%A5%BD")
-	if q["test"] != "123" {
+	if len(q["test"]) == 0 || q["test"][0] != "123" {
 		t.Errorf("GetQuery test = %v", q["test"])
 	}
-	if q["unicode"] != "好" {
+	if len(q["unicode"]) == 0 || q["unicode"][0] != "好" {
 		t.Errorf("GetQuery unicode = %v", q["unicode"])
 	}
 }
 
 func TestFilterQuery(t *testing.T) {
-	got := ufo.FilterQuery("/foo?bar=1&baz=2", func(key string, value any) bool {
+	got := ufo.FilterQuery("/foo?bar=1&baz=2", func(key string, value []string) bool {
 		return key != "bar"
 	})
 	if got != "/foo?baz=2" {
 		t.Errorf("FilterQuery = %q, want %q", got, "/foo?baz=2")
 	}
 	// no query → unchanged
-	if got2 := ufo.FilterQuery("/foo", func(k string, v any) bool { return true }); got2 != "/foo" {
+	if got2 := ufo.FilterQuery("/foo", func(k string, v []string) bool { return true }); got2 != "/foo" {
 		t.Errorf("FilterQuery no query = %q", got2)
 	}
 }

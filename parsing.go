@@ -6,6 +6,42 @@ import (
 	"strings"
 )
 
+// ParsedURL is the result of ParseURL.
+type ParsedURL struct {
+	Protocol         string // e.g. "http:"
+	Auth             string // e.g. "user:pass"
+	Host             string // e.g. "foo.com" or "foo.com:8080"
+	Pathname         string // e.g. "/foo"
+	Search           string // e.g. "?test=123"
+	Hash             string // e.g. "#token"
+	ProtocolRelative bool   // true when input had no protocol (e.g. "//foo.com")
+}
+
+// ParsedPath holds the path components split from a URL string.
+type ParsedPath struct {
+	Pathname string
+	Search   string
+	Hash     string
+}
+
+// ParsedAuth holds decoded username and password from a URL auth segment.
+type ParsedAuth struct {
+	Username string
+	Password string
+}
+
+// ParsedHost holds hostname and port parsed from a host string.
+type ParsedHost struct {
+	Hostname string
+	Port     string
+}
+
+// ParseFilenameOptions controls the behaviour of ParseFilename.
+type ParseFilenameOptions struct {
+	// Strict requires the final segment to contain a dot.
+	Strict bool
+}
+
 var (
 	specialProtoRe   = regexp.MustCompile(`(?i)^[\s\x00]*(blob:|data:|javascript:|vbscript:)(.*)`)
 	hasProtocolRe    = regexp.MustCompile(`^[\s\w\x00+.-]{2,}:([/\\]{2})?`)
@@ -157,17 +193,18 @@ func (url ParsedURL) String() string {
 		url.Protocol = url.Protocol + "//"
 	}
 
-	return fmt.Sprintf("%s%s%s%s%s%s",
-		url.Protocol,
-		url.Auth,
-		url.Host,
-		url.Pathname,
-		url.Search,
-		url.Hash,
-	)
+	var result string
+	result += url.Protocol
+	result += url.Auth
+	result += url.Host
+	result += url.Pathname
+	result += url.Search
+	result += url.Hash
+
+	return result
 }
 
-var _ fmt.Stringer = (*ParsedURL)(nil)
+var _ fmt.Stringer = ParsedURL{}
 
 // ParseFilename returns the last path segment from the URL's pathname.
 // With `opts.Strict` = true, only returns a name that contains a dot.

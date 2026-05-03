@@ -1,26 +1,27 @@
 package ufo
 
 import (
-	"fmt"
 	"strings"
 )
 
-// ParseQuery parses and decodes a query string into
-// a map. The input can be a query string with or
-// without the leading "?".
+// QueryObject is a map of query key to one or more string values.
+type QueryObject map[string][]string
+
+// ParseQuery parses and decodes a query string into a map. The input
+// can be a query string with or without the leading "?".
 //
-// The `__proto__` and `constructor` keys are ignored
-// to prevent prototype pollution.
+// The `__proto__` and `constructor` keys are ignored to prevent
+// prototype pollution.
 //
 // Examples:
 //
 //	ParseQuery("?foo=bar&baz=qux")
-//	// map[string]any{ foo: "bar", baz: "qux" }
+//	// QueryObject{ "foo": ["bar"], "baz": ["qux"] }
 //
 //	ParseQuery("tags=javascript&tags=web&tags=dev")
-//	// map[string]any{ tags: ["javascript", "web", "dev"]}
-func ParseQuery(parametersString string) map[string]any {
-	result := make(map[string]any)
+//	// QueryObject{ "tags": ["javascript", "web", "dev"] }
+func ParseQuery(parametersString string) QueryObject {
+	result := make(QueryObject)
 	if parametersString == "" {
 		return result
 	}
@@ -48,59 +49,46 @@ func ParseQuery(parametersString string) map[string]any {
 		}
 
 		value := DecodeQueryValue(rawVal)
-
-		existing, exists := result[key]
-		if !exists {
-			result[key] = value
-		} else if arr, ok := existing.([]string); ok {
-			result[key] = append(arr, value)
-		} else {
-			result[key] = []string{existing.(string), value}
-		}
+		result[key] = append(result[key], value)
 	}
 
 	return result
 }
 
-// EncodeQueryItem encodes a key-value pair into
-// a URL query string value. If the value is an array,
-// it will be encoded as multiple key-value pairs with
-// the same key.
+// EncodeQueryItem encodes a key and its values into URL query string
+// segments. Multiple values produce multiple key=value pairs joined
+// with "&". A nil or empty slice produces only the key with no value.
 //
 // Examples:
 //
-//	EncodeQueryItem("message", "Hello World")
+//	EncodeQueryItem("message", []string{"Hello World"})
 //	// "message=Hello+World"
 //
-//	EncodeQueryItem("tags", "[javascript", "web", "dev"])
+//	EncodeQueryItem("tags", []string{"javascript", "web", "dev"})
 //	// "tags=javascript&tags=web&tags=dev"
-func EncodeQueryItem(key string, value any) string {
-	if value == nil {
+func EncodeQueryItem(key string, values []string) string {
+	if len(values) == 0 {
 		return EncodeQueryKey(key)
 	}
 
-	switch v := value.(type) {
-	case []any:
-		parts := make([]string, 0, len(v))
-		for _, item := range v {
-			parts = append(parts, EncodeQueryKey(key)+"="+EncodeQueryValue(fmt.Sprintf("%v", item)))
-		}
-
-		return strings.Join(parts, "&")
-
-	default:
-		return EncodeQueryKey(key) + "=" + EncodeQueryValue(fmt.Sprintf("%v", v))
+	parts := make([]string, 0, len(values))
+	for _, v := range values {
+		parts = append(parts, EncodeQueryKey(key)+"="+EncodeQueryValue(v))
 	}
+
+	return strings.Join(parts, "&")
 }
 
+// String encodes the QueryObject into a URL query string without a
+// leading "?". Keys with nil or empty value slices are omitted.
 func (query QueryObject) String() string {
 	parts := make([]string, 0, len(query))
-	for k, v := range query {
-		if v == nil {
+	for k, vals := range query {
+		if len(vals) == 0 {
 			continue
 		}
 
-		item := EncodeQueryItem(k, v)
+		item := EncodeQueryItem(k, vals)
 		if item != "" {
 			parts = append(parts, item)
 		}
