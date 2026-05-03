@@ -213,7 +213,7 @@ Checks if the input has a trailing slash:
 HasTrailingSlash("/foo/", nil) // true
 HasTrailingSlash("/foo", nil) // false
 HasTrailingSlash("/foo?query=true", &RespectQueryAndFragmentOption{ true }) // false
-HasTrailingSlash("/foo/?query=true", &RespectQueryAndFragmentOption{ true }) // true
+HasTrailingSlash("/foo/?query=true", RespectQueryAndFragmentOption) // true
 ```
 
 ### `IsEmptyURL(url string) bool`
@@ -417,10 +417,6 @@ Ensures the URL ends with a trailing slash:
 WithTrailingSlash("/foo", nil) // "/foo/"
 WithTrailingSlash("/path?query=true", &RespectQueryAndFragmentOption{ true }) // "/path/?query=true"
 ```
-
-## Why?
-
-I'm a fan of the [unjs.io](https://unjs.io) ecosystem, particularly their excellent API design. So I thought why not Go?
 
 ## License
 
